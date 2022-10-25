@@ -17,6 +17,11 @@ for (i in 1:dim(isolates)[2]) {
   isolates[isolates[,i] %in% c('',' ', '  '), i] <- NA
 }
 
+# Create a date column using imputed month:
+isolates <- isolates %>% 
+  mutate(date.impute = paste0(paste(isolates$collection.yr, isolates$collection.mon, sep = '-'), '-01'),
+         date.impute = as.Date(date.impute))
+
 
 ##################################################################
 ######### Geographic information Data clean and Exploratory ######
@@ -87,6 +92,33 @@ fig_yoybyregion <- isolates %>%
 
 grid.arrange(fig_byregion, fig_yoybyregion, nrow=2, top=textGrob("Figure: Number of Isolates by Region (NA removed)"))
 
+# Monthly trend by region:
+fig_MoMbyregion <- isolates %>% 
+  filter(region != 'NA' & !is.na(collection.mon) & !is.na(year) & year_grp == 'post2010') %>%
+  group_by(region,year_grp, collection.mon) %>% 
+  summarise(n = n(), n_strain = n_distinct(Strain)) %>%
+  
+  ggplot() +
+  geom_line(aes(x=as.factor(collection.mon), y = n, group = region, color=region)) +
+  geom_point(aes(x=as.factor(collection.mon), y = n, group = region, color=region)) +
+  labs(x='Collection Month', y = 'Number of Isolates', title='Number of Isolates by Month and Region (2010-2022)')
+
+fig_MoMbyregion
+
+
+
+# We can also create a historical plot:
+fig_historybyregion <- isolates %>% 
+  filter(region != 'NA' & !is.na(collection.mon) & !is.na(year) & year_grp == 'post2010') %>%
+  group_by(region, date.impute,collection.mon) %>% 
+  summarise(n = n(), n_strain = n_distinct(Strain)) %>%
+  ggplot() +
+  geom_line(aes(x=date.impute, y = n, group = region, color=region)) +
+  # geom_point(aes(x=date.impute, y = n, group = region, color=region)) +
+  labs(x='Collection Date', y = 'Number of Isolates', title='Historical Number of Isolates by Region')
+
+fig_historybyregion
+grid.arrange(fig_MoMbyregion, fig_historybyregion, nrow=2)
 
 
 ######### YoY trend by US states #########
@@ -122,7 +154,8 @@ grid.arrange(fig_states_bar, fig_states_line, nrow=2, top=textGrob("Figure: Numb
 ##################################################################
 ############## Missing pattern for isolation source ##############
 ##################################################################
-# Gary's code:
+
+############ Gary's code:############
 #Load Libraries
 # library(RecordLinkage)
 library(lubridate)
@@ -132,6 +165,7 @@ library(forcats)
 
 #Load Dataset
 # isolates <- read.csv("/Users/garyzhou/Downloads/isolates-2.csv")
+
 
 #Explore Isolation Source
 str(isolates)
@@ -198,7 +232,7 @@ head(sort(table(testt_iso), decreasing=TRUE), n=100)
 sum(head(sort(table(testt_iso), decreasing=TRUE), n=15)) #75% of data in first 15 levels
 
 
-# End of Gary's code
+############# End of Gary's code ############
 
 # Add strata column:
 isolates <- isolates %>% 
