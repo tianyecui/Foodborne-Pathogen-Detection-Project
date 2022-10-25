@@ -37,6 +37,7 @@ isolates <- isolates %>% mutate(region = ifelse(substr(location_new,1,3) =='USA'
 
 
 ########## Visualize by region ######### 
+# NOTE: The visualization code could be streamlined and function-ized
 # by region:
 byRegion <- isolates %>% 
   group_by(region) %>% 
