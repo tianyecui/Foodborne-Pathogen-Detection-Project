@@ -24,7 +24,7 @@ isolates <- isolates %>%
 
 
 ##################################################################
-######### Geographic information Data clean and Exploratory ######
+####### Geographic information Data clean and related plots ######
 ##################################################################
 
 # Initial clean up is finished in 'isolates_cleaned_location.csv', here we did a bit more clean up to extract US states and create region:
@@ -37,11 +37,10 @@ isolates <- isolates %>% mutate(region = ifelse(substr(location_new,1,3) =='USA'
 
 
 ########## Visualize by region ######### 
-byRegiontbl <- isolates %>% group_by(region) %>% summarise(n = n(), n_strain = n_distinct(Strain))
-byStatestbl <- isolates %>% filter(region=='USA') %>% group_by(US_state) %>% summarise(n = n(), n_strain = n_distinct(Strain))
-
 # by region:
-byRegion <- byRegiontbl %>%
+byRegion <- isolates %>% 
+  group_by(region) %>% 
+  summarise(n = n(), n_strain = n_distinct(Strain)) %>%
   filter(region != 'NA') %>%
   ggplot() +
   geom_bar(aes(x = reorder(region, n), y = n), 
@@ -52,7 +51,10 @@ byRegion <- byRegiontbl %>%
 
 
 # by US states:
-byState <- byStatestbl %>% filter(US_state != 'unknown') %>%
+byState <-  isolates %>% filter(region=='USA') %>%
+  group_by(US_state) %>% 
+  summarise(n = n(), n_strain = n_distinct(Strain)) %>%
+  filter(US_state != 'unknown') %>%
   ggplot() +
   geom_bar(aes(x = reorder(US_state, n), y = n), 
            stat = 'identity', alpha=0.8)  +
@@ -67,8 +69,7 @@ grid.arrange(byRegion, byState, ncol=2, top=textGrob("Figure: Number of Isolates
 
 ######### Visualize by Year and Region: ######### 
 # Add year_grp to differentiate before and after 2010 (the actual cut-off should be May 2010 though)
-isolates <- isolates %>% mutate(year = (substr(Collection.date,1,4)),
-                                year_grp = ifelse(year<=2010, 'prior2010', 'post2010'))
+isolates <- isolates %>% mutate(year = (substr(Collection.date,1,4)), year_grp = ifelse(year<=2010, 'prior2010', 'post2010'))
 
 # Isolates over year since 2010:
 fig_byregion <- isolates %>% 
@@ -76,8 +77,7 @@ fig_byregion <- isolates %>%
   summarise(n = n(), n_strain = n_distinct(Strain)) %>%
   filter(region != 'NA' & !is.na(year) & year_grp == 'post2010') %>%
   ggplot() +
-  geom_bar(aes(x = year, y = n, fill=region),
-           stat = 'identity', alpha=0.8) +
+  geom_bar(aes(x = year, y = n, fill=region), stat = 'identity', alpha=0.8) +
   labs(x='Collection Year', y = 'Number of Isolates',  title='Number of Isolates Over Year by Region')
 
 # YoY trend by region
@@ -97,7 +97,6 @@ fig_MoMbyregion <- isolates %>%
   filter(region != 'NA' & !is.na(collection.mon) & !is.na(year) & year_grp == 'post2010') %>%
   group_by(region,year_grp, collection.mon) %>% 
   summarise(n = n(), n_strain = n_distinct(Strain)) %>%
-  
   ggplot() +
   geom_line(aes(x=as.factor(collection.mon), y = n, group = region, color=region)) +
   geom_point(aes(x=as.factor(collection.mon), y = n, group = region, color=region)) +
@@ -107,14 +106,13 @@ fig_MoMbyregion
 
 
 
-# We can also create a historical plot:
+# We can also create a historical plot (by month and year):
 fig_historybyregion <- isolates %>% 
   filter(region != 'NA' & !is.na(collection.mon) & !is.na(year) & year_grp == 'post2010') %>%
   group_by(region, date.impute,collection.mon) %>% 
   summarise(n = n(), n_strain = n_distinct(Strain)) %>%
   ggplot() +
   geom_line(aes(x=date.impute, y = n, group = region, color=region)) +
-  # geom_point(aes(x=date.impute, y = n, group = region, color=region)) +
   labs(x='Collection Date', y = 'Number of Isolates', title='Historical Number of Isolates by Region')
 
 fig_historybyregion
@@ -122,19 +120,21 @@ grid.arrange(fig_MoMbyregion, fig_historybyregion, nrow=2)
 
 
 ######### YoY trend by US states #########
+# create list of states that have highest N_isolates:
 highest_state <- byStatestbl %>% arrange(desc(n)) %>% slice_max(n=11, order_by = n) %>% select(US_state)
 
-
-fig_states_bar<- isolates %>%
+# Plot only the higest_state:
+# Bar chart: show proportion:
+fig_states_bar <- isolates %>%
   filter(region=='USA' &US_state != 'unknown' & !is.na(year) & year_grp == 'post2010' 
          & US_state %in% highest_state$US_state) %>%
   group_by(US_state,year_grp, year) %>% 
   summarise(n = n(), n_strain = n_distinct(Strain)) %>%
   ggplot() +
-  geom_bar(aes(x = year, y = n, fill=US_state),
-           stat = 'identity', alpha=0.8) +
+  geom_bar(aes(x = year, y = n, fill=US_state), stat = 'identity', alpha=0.8) +
   labs(x='Collection Year', y = 'Number of Isolates',  title='Number of Isolates Over Year by States')
 
+# Line chart: show trend over time.
 fig_states_line <- isolates %>% 
   filter(region=='USA' &US_state != 'unknown' & !is.na(year) & year_grp == 'post2010' 
          & US_state %in% highest_state$US_state) %>%
@@ -155,16 +155,11 @@ grid.arrange(fig_states_bar, fig_states_line, nrow=2, top=textGrob("Figure: Numb
 ############## Missing pattern for isolation source ##############
 ##################################################################
 
-############ Gary's code:############
+############ Gary's code (will change this to use source('Rfile') in the future): ############
 #Load Libraries
-# library(RecordLinkage)
 library(lubridate)
 library(tidyverse)
-# library(stringdist)
 library(forcats)
-
-#Load Dataset
-# isolates <- read.csv("/Users/garyzhou/Downloads/isolates-2.csv")
 
 
 #Explore Isolation Source
@@ -230,8 +225,6 @@ testt_iso <- fct_collapse(test_iso, Missing = c("", "not provided", "not collect
 #Look at unique isolation sources in descending order
 head(sort(table(testt_iso), decreasing=TRUE), n=100)
 sum(head(sort(table(testt_iso), decreasing=TRUE), n=15)) #75% of data in first 15 levels
-
-
 ############# End of Gary's code ############
 
 # Add strata column:
@@ -239,7 +232,6 @@ isolates <- isolates %>%
   mutate(testt_iso, 
          missing_source = ifelse(is.na(testt_iso) | testt_iso=='Missing', 1,0))
 
-# CTO <- CreateTableOne(data=isolates, vars=c('region','US_state', 'Min.diff','Min.same'), strata ='missing_source')
 CTO <- CreateTableOne(data=isolates, vars=c('region', 'Min.diff','Min.same'), strata ='missing_source')
 
 
