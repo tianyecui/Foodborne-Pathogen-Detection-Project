@@ -7,7 +7,7 @@ library(forcats)
 ###########Imputed Dataset
 isolates <- read.csv("/Users/garyzhou/Downloads/isolates_filtered_collect_date_imputed.csv")
 isolates_NN <- isolates
-isolates_NN <- subset(isolates_NN, !(location_new %in% c("Asia", "Europe", "North America", "South America", "Oceania")))
+isolates_NN <- subset(isolates_NN, !(location_new %in% c("Asia", "Europe", "North America", "South America", "Oceania", "Africa")))
 unique_isol_source <- unique(isolates_NN$Isolation.source)
 
 #Cases with just Cow and no Chicken or Pork
