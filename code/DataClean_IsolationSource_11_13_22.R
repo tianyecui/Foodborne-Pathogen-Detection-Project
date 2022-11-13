@@ -139,6 +139,7 @@ grep("pasta", unique_isol_source, ignore.case=TRUE, value=TRUE)
 ####################################################################################################################################################################################
 ##### Cheese #####
 cheese <- grep("cheese", unique_isol_source, ignore.case=TRUE, value=TRUE)
+Cheese <- cheese[!grepl("ham|chicken|popcorn", cheese)]
 ### Exclude ###
 #"ham cheese sandwich", "BACON & CHEESE COOKED BRAT", "beef beans rice cheese burrito", "egg cheese salad", "ham green onion cheese salad"
 #"ham and cheese sandwich", "ready to eat egg ham and cheese burrito", "chicken cheese chimichanga", "ham salami cheese lettuce and tomato sandwich",
@@ -160,7 +161,7 @@ grep("cheese", unique_isol_source, value=TRUE)
 dairy <- grep("dairy", unique_isol_source, ignore.case=TRUE, value=TRUE)
 milk <- c("milk", "Milk filter", "raw milk", "milk filter")
 icecream <- grep("ice cream", unique_isol_source, ignore.case=TRUE, value=TRUE)
-Dairy <- c(cheese, milk, icecream, dairy)
+Dairy <- c(Cheese, milk, icecream, dairy)
 
 ##### Fruit #####
 cherry <- grep("cherry", unique_isol_source, ignore.case=TRUE, value=TRUE)
@@ -227,7 +228,7 @@ testt_iso <- fct_collapse(test_iso, Missing = c("", "missing", "not provided", "
                           Food = c("food", "Food products"),
                           Food_Producing_Environment = c("food producing environment surface", "meat processing facility", "food producing environment", 
                                                          "food processing", "Food processing environment", "food processing environment", "Food and food processing environment",
-                                                         "environmental swab from ready to eat facility"),
+                                                         "environmental swab from ready to eat facility", "Environmental: food-contact surface"),
                           Environment = c("swab", Environment, soil_new, "sponge", "envrionmental swab sponge", env_water, "manure"),
                           Clinical = c("clinical", "clinical isolate", "clinical sample", "clinical/host-associated", Ascites, Amniotic, Bile, c("blood", "Blood, NOS", "Blood culture"),
                                        CSF),
