@@ -221,33 +221,45 @@ Bile <- bile[!grepl("ham", bile)]
 grep("blood", unique_isol_source, ignore.case=TRUE, value=TRUE)
 CSF <- c(grep("CSF", unique_isol_source, ignore.case=TRUE, value=TRUE), 
   "cerebrospinal fluid", "Cerebral spinal fluid", "Cerebrospinal fluid, NOS", "blood cerebrospinal fluid", "Cerebrospianl fluid", "Cerebral Spinal Fluid")
+
+#Animal Feces
+animal_rectal <- grep("rectal", unique_isol_source, ignore.case=TRUE, value=TRUE)
+Animal_rectal <- animal_rectal[!grepl("Rectal", animal_rectal)]
+
+animal_feces <- grep("feces", unique_isol_source, ignore.case=TRUE, value=TRUE)
+Animal_feces <- animal_feces[!grepl("poultry|blood", animal_feces)]
+Animal_Feces <- Animal_feces[-which(Animal_feces == "feces")]
 ####################################################################################################################################################################################
 #Change all NA to "missing"
 test_iso[is.na(test_iso)] <- "missing"
-testt_iso <- fct_collapse(test_iso, Missing = c("", "missing", "not provided", "not collected", "Not available", "other"),
+testt_iso <- fct_collapse(test_iso, Missing = c("", "missing", "not provided", "not available", "not collected", "Not available", "other"),
                           Food = c("food", "Food products"),
-                          Food_Producing_Environment = c("food producing environment surface", "meat processing facility", "food producing environment", 
-                                                         "food processing", "Food processing environment", "food processing environment", "Food and food processing environment",
-                                                         "environmental swab from ready to eat facility", "Environmental: food-contact surface"),
-                          Environment = c("swab", Environment, soil_new, "sponge", "envrionmental swab sponge", env_water, "manure"),
-                          Clinical = c("clinical", "clinical isolate", "clinical sample", "clinical/host-associated", Ascites, Amniotic, Bile, c("blood", "Blood, NOS", "Blood culture"),
-                                       CSF),
-                          Meat = c("retail meat", "meat", "Raw Meat", Beef, "ovine", c(pork_final, "ham"), chicken_final, Egg, Turkey, "minced meat"),
+                          Food_Producing_Environment = c("food producing environment surface", "meat environment", "meat processing facility", "food producing environment", 
+                                                         "food processing", "food contact surface", "Food production environment","Food processing environment", "food processing environment", "Food and food processing environment",
+                                                         "environmental swab from ready to eat facility", "Environmental: food-contact surface", "Food contact surface in food processing environment",
+                                                         "Slaughterhouse-environment", "environmental swab sponge food contact surface", "environmental swab sponge produce facility"),
+                          Environment = c("swab", "Silage", "Factory", Environment, "Drain", soil_new, "sponge", "silage", "envrionmental swab sponge", env_water, "manure", "surface wipe"),
+                          Clinical = c("clinical", "clinical isolate", "neonate pharyngeal smear", "clinical sample", "clinical/host-associated", Ascites, Amniotic, Bile, "body fluid", "Pleural Fluid", "urine",
+                                       c("blood", "Blood, NOS", "Blood culture"), "wound", "stool", "feces", "placenta", "whole blood", "Tissue", "tissue", "external ear canal",
+                                       CSF, "cervico-vaginal swab", "Fluid", "Abscess", "Cerebrospinal fluid (meningitis)", "Fluid Pleural", "Ear swab", "cystic fluid"),
+                          Meat = c("retail meat", "raw meat", "mixed meats", "meat", "Raw Meat", "mixed ground meat", Beef, "ovine", c(pork_final, "ham"), "poultry", chicken_final, Egg, Turkey, "minced meat", "ground meat", "lamb", "bacon"),
                           Human_Source = c("human", "human listeriosis", "patient"),
                           RTE_Food = c("ready to eat food", "RTE Product"),
-                          Dairy =  c(Dairy, "raw cow milk"),
-                          Vegetables = c(Vegetable_Row_Crop, Seeded_veg, Root, Vegetable, Fungi, bean, "hummus"),
-                          Fruit = c(Fruit, c(grep("avocado", unique_isol_source, ignore.case=TRUE, value=TRUE), "guacamole", "frozen guacamole")),
-                          Seafood = Seafood,
-                          Cured_Processed_Meat_Source = c(Meat_stick, "Salami", "salami paste production", "salami", "retail deli", "drain-deli", "deli meat", "Deli swab", "deli", "sausage"),
-                          Cow_Feces = c("feces cow", "Cow feces")
+                          Dairy =  c(Dairy, "raw cow milk", "milk (Bos taurus)", "milk product", "bulk tank milk", "butter", "Milking system", "teat swab","Udders", "Raw Milk", "milk-raw bovine", "raw bovine milk", "Pasteurized Milk"),
+                          Vegetables = c(Vegetable_Row_Crop, "produce", "packaged pickles", "Food - Horticulture", Seeded_veg, Root, Vegetable, Fungi, bean, "hummus", "salad"),
+                          Fruit = c(Fruit, "corn", "frozen corn", c(grep("avocado", unique_isol_source, ignore.case=TRUE, value=TRUE), "guacamole", "frozen guacamole",
+                                                                    "fresh guacamole", "fresh raw guacamole")),
+                          Seafood = c(Seafood, "sushi"),
+                          Cured_Processed_Meat_Source = c(Meat_stick, "cooked ham", "ready to eat deli meat ham", "deli ham","Salami", "salami paste production", "salami", "mixed meat sausage",
+                                                          "tea sausage", "retail deli", "drain-deli", "deli meat", "Deli swab", "deli", "sausage", "pork beef sausage"),
+                          Animal_Feces = c(Animal_Feces, Animal_rectal)
                           )
 
 #Look at unique isolation sources in descending order
 head(sort(table(testt_iso), decreasing=TRUE), n=15)
 sum(head(sort(table(testt_iso), decreasing=TRUE), n=15)) #93% of data in first 15 levels
 
-sort(table(testt_iso), decreasing=TRUE)[1:50]
+sort(table(testt_iso), decreasing=TRUE)[1:70]
 sort(table(testt_iso), decreasing=TRUE)[50:200]
 sort(table(testt_iso), decreasing=TRUE)[300:600]
 
