@@ -1,14 +1,13 @@
 setwd('/Users/yvonne/Downloads/PHP2550/pda_project')
 
-# knitr::purl('eda_proj.Rmd', 'eda_proj.R', documentation = 2)
 
-source('eda_proj.R')
+source('eda_proj.R') # pre-processing code was included there
 isolates <- isolates_USA_only
 
 # Complete cases for isolation group:
-dim(isolates[!is.na(isolates$Isolation_Group), ])
 isolates <- isolates[!is.na(isolates$Isolation_Group), ]
-# 17795    59
+dim(isolates)
+# 17795    60
 
 ############### Create Season variable: (based on collection.mon) ###############
 isolates <- isolates %>% mutate (season = ifelse(collection.mon %in% c(3,4,5), 'spring',
@@ -21,6 +20,7 @@ isolates <- isolates %>% mutate (season = ifelse(collection.mon %in% c(3,4,5), '
 # remove NA season:
 isolates <- isolates %>% filter(!is.na(season))
 dim(isolates)
+# 15668    60
 
 ############### Create US region: ###############
 northeast <- c('USA:CT', 'USA:ME', 'USA:VT', 'USA:NH', 'USA:MA', 'USA:RI','USA:NY', 'USA:NJ', 'USA:PA')
@@ -39,59 +39,41 @@ isolates <- isolates %>% mutate(USregion = ifelse(location_new %in% northeast, '
 # tmp2 <- isolates %>% select(USregion, location_new) %>% unique()
 
 
-# Just look at US regions:
+# Just look at US regions where state information is known:
 isolates <- isolates %>% filter(USregion != 'other')
 dim(isolates)
+# 11332    61
 
-# source_sum <- isolates %>% group_by(Isolation.source) %>% summarise(n())
 
 ############### Just keep some certain sources for now: ###############
-# temp_source <- c('environmental swab', 'food', 'blood')
-# temp_source <- c('pork', 'chicken', 'beef', 'blood','milk')
-# temp_source <- c('food', 'blood') # this is used in neural network
-# temp_source <- c('food', 'blood', 'water') # this is used in multinomial
-
-# isolates_sub <- isolates %>% filter(Isolation.source %in% temp_source)
-
-
-# Replace with Gary's category:
-length(isolates$Isolation.source)
-length(isolates$Isolation_Group)
+# !!!Replace Isolation source with Gary's refined category:
+length(isolates$Isolation.source) == length(isolates$Isolation_Group)
 
 isolates$Isolation.source <- isolates$Isolation_Group
 isolates$Isolation.source <- as.factor(isolates$Isolation.source)
 
-unique(isolates$Isolation.source)
-dim(isolates)
 
 # keep complete cases for mindiff/same:
-# isolates_sub_comp <- isolates_sub[complete.cases(isolates_sub$Min.diff) & complete.cases(isolates_sub$Min.same), ]
 isolates_sub_comp <- isolates %>% 
   # drop those with both missing in min.diff and min.same
   filter(!is.na(Min.diff) | !is.na(Min.same)) %>%
   # update min.diff
   mutate(Min.diff.new=pmin(Min.diff, Min.same, na.rm=T))
 
+# !!!Replace Min.diff with Tianye's refined mindiff:
 isolates_sub_comp$Min.diff <- isolates_sub_comp$Min.diff.new
 dim(isolates_sub_comp)
+# 10373    62
 
 
-# write.csv(isolates_sub_comp, file='isolates_sub_comp.csv')
-
-##########################################################################################
-isolates_sub_sum <- colSum(isolates_sub_comp)
-isolates_sub_sum
-
-features <- c('SNP.cluster', 'Contigs','AMR.genotypes', 'location_new', 'USregion', 'Isolation.source', 'season',
-              'Min.diff')
+################################ Only keep several variables to use##########################################################
+features <- c('SNP.cluster', 'Contigs','AMR.genotypes', 'location_new', 'USregion', 'Isolation.source', 'season', 'Min.diff')
 
 df <- isolates_sub_comp[,features]
-colSum(df)
 dim(df)
-df <- df[complete.cases(df), ]
-dim(df)
+# [1] 10373     8
 
-# Now, Final variables were selected
+# Now, Final variables were selected. Set categorical var as factor: 
 df$SNP.cluster <- as.factor(df$SNP.cluster)
 df$AMR.genotypes <- as.factor(df$AMR.genotypes)
 df$location_new <- as.factor(df$location_new)
@@ -104,12 +86,155 @@ df$season <- relevel(df$season, ref='spring')
 
 # drop unused levels:
 df$Isolation.source <- droplevels(df$Isolation.source)
-# df$location_new <- droplevels(df$location_new)
 df$USregion <- droplevels(df$USregion)
 df$AMR.genotypes <- droplevels(df$AMR.genotypes)
 
 
-######## Balance Class ######## 
+################################################################
+########## Multinomial Logistic Regression ################
+################################################################
+require(nnet)
+library(lmtest)
+library(mlogit)
+######################## R: multinom #################################### 
+# Data structure for multinom function: frequency tables:
+df <- df %>% select(USregion, Isolation.source, AMR.genotypes, season, Min.diff)
+df_multi <- df %>%
+  select(USregion, Isolation.source, AMR.genotypes, season, Min.diff) %>%
+  group_by(USregion, Isolation.source, AMR.genotypes, season) %>% 
+  summarise(freq = n(), avg_diff = mean(Min.diff))
+
+# gm0: only main effects:
+gm0 <- multinom(Isolation.source ~ USregion + avg_diff + season , data = df_multi, weights = freq)
+summary(gm0)
+BIC(gm0)
+
+# 95% CI:
+lower_ci <- summary(gm0)$coefficients - 1.96 * summary(gm0)$standard.errors  
+lower_ci %>%
+  data.frame() %>%  round(2) %>%
+  kbl(caption = "95% CI - lower bound") %>%
+  kable_styling
+
+upper_ci <- summary(gm0)$coefficients + 1.96 * summary(gm0)$standard.errors 
+upper_ci %>%
+  data.frame() %>% round(2) %>%
+  kbl(caption = "95% CI - upper bound") %>%
+  kable_styling
+
+write.csv(lower_ci, 'lower_ci.csv')
+write.csv(upper_ci, 'upper_ci.csv')
+
+# gm1: with interaction
+gm1 <- multinom(Isolation.source ~ avg_diff + season*USregion , data = df_multi, weights = freq)
+summary(gm1)
+
+# gm2: include AMR genotypes
+gm2 <- multinom(Isolation.source ~ USregion + avg_diff + season + AMR.genotypes, data = df_multi, weights = freq)
+summary(gm2)
+exp(coef(gm2))
+
+# Compare BIC
+BIC(gm0)
+BIC(gm1) # best
+BIC(gm2)
+
+# 
+lrtest(gm0, gm1) #gm1 better
+lrtest(gm0, gm2) #gm2 better, but lower BIC
+
+plot(df$Isolation.source, df$Min.diff)
+plot(df$Isolation.source, df$season)
+plot(df$Isolation.source, df$USregion)
+
+
+
+########################## Sanity check: ##########################
+obs <- df_multi %>%
+  pivot_wider(names_from = Isolation.source, values_from = freq, values_fn = sum, values_fill = 0)
+dim(df_multi)
+dim(obs)
+
+# somehow we lost 1 row after pivoting to wider... so we did left join below to ensure that we don't miss any records
+obsTmp <- df_multi %>% left_join(obs, by=c('USregion', 'season', 'AMR.genotypes', 'avg_diff'))
+dim(obsTmp)
+
+# Just keep the frequency columns:
+obs <- t(obsTmp[, (ncol(obsTmp)-4):ncol(obsTmp)])
+obs
+
+# Expected (probabilities)
+exp <- t(fitted(gm0))
+exp
+
+for (i in 1:ncol(exp)) {
+  exp[, i] <- exp[, i] * sum(obs[, i])
+}
+
+seeResult <- round(cbind(t(exp), t(obs)))
+# rename columns:
+newnames <- c()
+for (i in 1:5) newnames[i] <- paste0('Exp.',  colnames(seeResult)[i])
+for (i in 6:10) newnames[i] <- paste0('Obs.',  colnames(seeResult)[i])
+newnames
+colnames(seeResult) <- newnames
+
+# Initial visualization for expected vs observed:
+seeResult <- cbind(obsTmp[,1:6], seeResult)
+ggplot(data=seeResult) +
+  geom_point(aes(Obs.Environment, Exp.Environment)) +
+  geom_point(aes(Obs.Land_Animal, Exp.Land_Animal), col='red') +
+  geom_point(aes(Obs.Aquatic_Animal, Exp.Aquatic_Animal), col='blue') +
+  geom_point(aes(Obs.Plants, Exp.Plants), col='green')
+
+head(seeResult, 8) %>% kbl(caption = "Observed vs Expected Frequencies") %>% kable_styling
+
+
+
+
+######################## Another R func: Mlogit #################################### 
+# data structure for Mlogit:
+mdata <- mlogit.data(df, varying = NULL, choice='Isolation.source', shape='wide')
+
+# can also add ipw weights later
+mlogit0 <- mlogit(Isolation.source ~ 1| Min.diff + USregion + season, data = mdata, reflevel = 'Environment')
+summary(mlogit0)
+# exp(coef(mlogit0))
+
+mlogit_fit <- fitted(mlogit0, outcome = FALSE) # ref: http://www2.uaem.mx/r-mirror/web/packages/mlogit/vignettes/mlogit.pdf
+
+# plot(mlogit_fit[,1], type='l')
+# hist(mlogit_fit[,4])
+
+
+mlogit1 <- mlogit(Isolation.source ~ 1| Min.diff + season, data = mdata, reflevel = 'Environment')
+
+mlogit2 <- mlogit(Isolation.source ~ 1| Min.diff, data = mdata, reflevel = 'Environment')
+
+mlogit3 <- mlogit(Isolation.source ~ 1| Min.diff + USregion + season + AMR.genotypes, data = mdata, reflevel = 'Environment')
+
+lrtest(mlogit1, mlogit2)
+lrtest(mlogit1, mlogit0)
+lrtest(mlogit2, mlogit0)
+lrtest(mlogit3, mlogit0)
+
+
+mlogit4 <- mlogit(Isolation.source ~ 1| Min.diff + USregion * season, data = mdata, reflevel = 'Environment')
+summary(mlogit4)
+lrtest(mlogit4, mlogit0)
+
+AIC(mlogit3)
+
+
+
+
+
+
+
+#######################################################################################
+########### Code for preparing initial Neural network data (Unused for now) ###########
+
+################################ Balance Class ######################################## 
 idx1 = which(df$Isolation.source =='food') #2552
 idx0 = which(df$Isolation.source =='blood') #1266
 
@@ -167,133 +292,3 @@ write.csv(test_y, file='test_y.csv')
 
 
 
-
-
-df<- df %>% 
-  # drop those with both missing in min.diff and min.same
-  filter(!is.na(Min.diff) | !is.na(Min.same)) %>%
-  # update min.diff
-  mutate(Min.diff=min(Min.diff, Min.same, na.rm=T))
-
-
-
-
-
-
-
-########## Multinomial Logistic Regression ################
-require(nnet)
-library(lmtest)
-library(mlogit)
-names(df)
-
-df <- df %>% select(USregion, Isolation.source, AMR.genotypes, season, Min.diff)
-df_multi <- df %>%
-  select(USregion, Isolation.source, AMR.genotypes, season, Min.diff) %>%
-  group_by(USregion, Isolation.source, AMR.genotypes, season) %>% 
-  summarise(freq = n(), avg_diff = mean(Min.diff))
-
-
-
-gm0 <- multinom(Isolation.source ~ USregion + avg_diff + season , data = df_multi, weights = freq)
-summary(gm0)
-BIC(gm0)
-
-gm1 <- multinom(Isolation.source ~ avg_diff + season*USregion , data = df_multi, weights = freq)
-summary(gm1)
-
-
-gm2 <- multinom(Isolation.source ~ USregion + avg_diff + season + AMR.genotypes, data = df_multi, weights = freq)
-summary(gm2)
-coef(gm2)
-exp(coef(gm2))
-dim(fitted(gm2))
-
-BIC(gm0)
-BIC(gm1)
-BIC(gm2)
-
-
-lrtest(gm0, gm1)
-lrtest(gm0, gm2) #gm2 better
-
-plot(df$Isolation.source, df$Min.diff)
-plot(df$Isolation.source, df$season)
-plot(df$Isolation.source, df$USregion)
-
-
-
-
-# Mlogit:
-mdata <- mlogit.data(df, varying = NULL, choice='Isolation.source', shape='wide')
-# can also add weights:
-mlogit0 <- mlogit(Isolation.source ~ 1| Min.diff + USregion + season, data = mdata, reflevel = 'Environment')
-summary(mlogit0)
-exp(coef(mlogit0))
-
-fitted(mlogit0, outcome = FALSE) # ref: http://www2.uaem.mx/r-mirror/web/packages/mlogit/vignettes/mlogit.pdf
-
-
-
-mlogit1 <- mlogit(Isolation.source ~ 1| Min.diff + season, data = mdata, reflevel = 'Environment')
-
-mlogit2 <- mlogit(Isolation.source ~ 1| Min.diff, data = mdata, reflevel = 'Environment')
-
-mlogit3 <- mlogit(Isolation.source ~ 1| Min.diff + USregion + season + AMR.genotypes, data = mdata, reflevel = 'Environment')
-summary(mlogit3)
-# lrtest(mlogit0, mlogit3)
-
-lrtest(mlogit1, mlogit2)
-lrtest(mlogit1, mlogit0)
-lrtest(mlogit2, mlogit0)
-lrtest(mlogit3, mlogit0)
-
-
-mlogit00 <- mlogit(Isolation.source ~ 1| Min.diff + USregion * season, data = mdata, reflevel = 'Environment')
-summary(mlogit00)
-lrtest(mlogit00, mlogit0)
-BIC(mlogit0)
-AIC(mlogit3)
-
-
-
-############# Sanity check: #############
-obs <- df_multi %>%
-  pivot_wider(names_from = Isolation.source, values_from = freq, values_fn = sum, values_fill = 0)
-dim(df_multi)
-dim(obs)
-
-# somehow we lost 1 row after pivoting to wider... so we did left join below to ensure that we don't miss any records
-obsTmp <- df_multi %>% left_join(obs, by=c('USregion', 'season', 'AMR.genotypes', 'avg_diff'))
-dim(obsTmp)
-
-# Just keep the frequency columns:
-obs <- t(obsTmp[, (ncol(obsTmp)-4):ncol(obsTmp)])
-obs
-
-
-exp <- t(fitted(gm1))
-exp
-
-for (i in 1:ncol(exp)) {
-  exp[, i] <- exp[, i] * sum(obs[, i])
-}
-seeResult <- round(cbind(t(exp), t(obs)))
-colnames(seeResult)
-
-newnames <- c()
-for (i in 1:5) newnames[i] <- paste0('Exp.',  colnames(seeResult)[i])
-for (i in 6:10) newnames[i] <- paste0('Obs.',  colnames(seeResult)[i])
-newnames
-colnames(seeResult) <- newnames
-
-seeResult <- cbind(obsTmp[,1:6], seeResult)
-ggplot(data=seeResult) +
-  geom_point(aes(Obs.Environment, Exp.Environment)) +
-  geom_point(aes(Obs.Land_Animal, Exp.Land_Animal), col='red') +
-  geom_point(aes(Obs.Aquatic_Animal, Exp.Aquatic_Animal), col='blue') +
-  geom_point(aes(Obs.Plants, Exp.Plants), col='green')
-
-head(seeResult, 8) %>% kbl(caption = "Observed vs Expected Frequencies") %>% kable_styling
-obs %>% kbl(caption = "Observed Frequencies") %>% kable_styling
-exp %>% kbl(caption = "Expected Frequencies") %>% kable_styling
