@@ -8,6 +8,8 @@ isolates <- isolates %>%
 # sanity check:
 # tmp1 <- isolates %>% select(season, collection.mon) %>% unique()
 
+isolates$season <- as.factor(df$season)
+isolates$season <- relevel(df$season, ref='spring')
 
 ############### Create US region: ###############
 northeast <- c('USA:CT', 'USA:ME', 'USA:VT', 'USA:NH', 'USA:MA', 'USA:RI','USA:NY', 'USA:NJ', 'USA:PA')
@@ -22,3 +24,5 @@ isolates <- isolates %>% mutate(USregion = ifelse(location_new %in% northeast, '
                                                   ifelse(location_new %in% midwest, 'midwest',
                                                          ifelse(location_new %in% south, 'south',
                                                                 ifelse(location_new %in% west, 'west', 'other')))))
+isolates$USregion <- as.factor(df$USregion)
+isolates$USregion <- relevel(df$USregion, ref='northeast')
