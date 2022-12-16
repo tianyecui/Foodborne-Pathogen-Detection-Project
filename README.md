@@ -10,9 +10,9 @@ The Listeria monocytogenes dataset was downloaded on Oct 23, 2022.
 
 - Both raw and intermediate data sets are documented under the "data" folder.
 
-- Code and preprocessing for the EDA and Level 1 Isolation Source Analysis can be found in under the "Code" folder.
+- Code and preprocessing for the EDA and Level 1 Isolation Source Analysis can be found in under the "Code/DataClean" folder.
 
-- Preprocessing for the sensitivity analysis for the Level 2 Food Categorization Groups are located in the "/Code/Level_2" folder.
+- Preprocessing for the sensitivity analysis for the Level 2 Food Categorization Groups are located in the "Code/DataClean/Level_2" folder.
 
 - All results for both the primary analysis and sensitivity analysis are found in the "result" folder. Supplementary Material is found under "supplementary".
 
